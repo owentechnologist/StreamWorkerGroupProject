@@ -52,7 +52,7 @@ public class RedisStreamAdapter {
                 System.out.println("RedisStreamAdapter.namedGroupConsumerStartListening(--> "+consumerName+"  <--): Actively Listening to Stream "+streamName);
                 long counter = 0;
                 Map.Entry<String, StreamEntryID> streamQuery = null;
-                long blockTime = Long.MAX_VALUE;
+                long blockTime = Long.MAX_VALUE-200000; // on some OS MAX_VALUE results in a negative value! (overflow)
                 while(true) {
                     try (Jedis streamReader = connectionPool.getResource();) {
                         //grab one entry from the target stream at a time
