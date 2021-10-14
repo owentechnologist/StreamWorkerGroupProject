@@ -20,12 +20,12 @@ public class StreamWriter {
         this.streamName=streamName;
     }
 
-    public void kickOffStreamEvents(long maxNumber, int pauseSize){
+    public void kickOffStreamEvents(long maxNumber, long pauseSize){
         new Thread(new Runnable() {
             @Override
             public void run() {
                 Map<String, String> map1 = new HashMap<>();
-                long counter = 0;
+                long counter = 1;
                 while (true) {
                     try (Jedis streamReader = connectionPool.getResource();) {
                         String payload = faker.name().firstName();

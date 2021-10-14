@@ -6,6 +6,7 @@ import redis.clients.jedis.Jedis;
 import redis.clients.jedis.StreamEntry;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static com.redislabs.sa.ot.streamtest.StreamConstants.OUTPUT_STREAM_NAME;
 import static com.redislabs.sa.ot.streamtest.StreamConstants.PAYLOAD_KEYNAME;
@@ -14,11 +15,13 @@ public class TestStreamEventMapProcessor implements StreamEventMapProcessor {
 
     //make sure to set this value before passing this processor to the Stream Adapter
     private Object callbackTarget = null;
-    static long counter = 0;
+    static AtomicLong counter = new AtomicLong();
     private long sleepTime = 0;
 
-    public void setSleepTime(long sleepTime){
+    public TestStreamEventMapProcessor setSleepTime(long sleepTime)
+    {
         this.sleepTime = sleepTime;
+        return this;
     }
 
     @Override
@@ -52,13 +55,12 @@ public class TestStreamEventMapProcessor implements StreamEventMapProcessor {
     void writeToRedisStream(String originalId,String originalString,String calcString){
         Jedis jedis = null;
         try {
-            counter = counter+1;
             jedis = JedisConnectionFactory.getInstance().getJedisPool().getResource();
             HashMap<String, String> map = new HashMap<>();
             map.put("arg_provided", originalString);
             map.put("calc_result", calcString);
-            map.put(Runtime.getRuntime().toString()+"_Counter",""+counter);
-            map.put("originalId",originalId);
+            map.put(Runtime.getRuntime().toString()+"_Counter",""+counter.incrementAndGet());
+            map.put("EntryProvenanceMetaData",originalId);
             jedis.xadd(OUTPUT_STREAM_NAME, null, map);
         } catch (Throwable t) {
             System.out.println("WARNING:");

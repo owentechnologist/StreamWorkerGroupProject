@@ -65,7 +65,7 @@ public class RedisStreamAdapter {
                         value = streamEntryList.get(0);// entry written to stream
                         System.out.println("ConsumerGroup "+consumerGroupName+" and Consumer "+consumerName+" has received... "+key+" "+value);
                         Map<String,StreamEntry> entry = new HashMap();
-                        entry.put(key+":"+value.getID(),value);
+                        entry.put(key+":"+value.getID()+":"+consumerName,value);
                         lastSeenID = value.getID();
                         streamEventMapProcessor.processStreamEventMap(entry);
                         streamReader.xack(key, consumerGroupName, lastSeenID);
