@@ -14,6 +14,14 @@ import static com.redislabs.sa.ot.streamtest.StreamConstants.*;
  * Where "ddk" is the stream routing value and "3" is the starting value for the two
  * worker IDs to be used
  *
+ * To show Pending message use the following command in redis-cli to break one of the workers:
+ * xadd X:FOR_PROCESSING{xyz} * "stringOffered" "poisonpill"
+ *
+ * With this in mind - it may be best to make the reaper behave differently
+ * - maybe it collects pending messages and submits them to a special consumer that can handle poison
+ * (Currently the reaper just passes any pending messages found to worker #1)
+ * Reaper is commented out - now that the poison pill test exists
+ *
  */
 
 public class Main {
@@ -43,9 +51,6 @@ public class Main {
         DRIVER_STREAM_NAME = dataUpdatesStreamTarget;
 
 
-        //when using consumer groups the stream must already exist - so start writing first...
-        StreamWriter writer = new StreamWriter(DRIVER_STREAM_NAME,jedisPool);
-        writer.kickOffStreamEvents(10000,1);
         try{
             Thread.sleep(500); // give the writer time to establish some messages
         }catch(Throwable t){}
@@ -57,8 +62,11 @@ public class Main {
         TestStreamEventMapProcessor slowPoke = new TestStreamEventMapProcessor();
         slowPoke.setSleepTime(PENDING_MESSAGE_TIMEOUT);
         streamAdapter.namedGroupConsumerStartListening(""+(workerStartId+1),slowPoke);
-        StreamReaper reaper = new StreamReaper(dataUpdatesStreamTarget,jedisPool);
-        reaper.kickOffStreamReaping(PENDING_MESSAGE_TIMEOUT,CONSUMER_GROUP_NAME);
+        //StreamReaper reaper = new StreamReaper(dataUpdatesStreamTarget,jedisPool);
+        //reaper.kickOffStreamReaping(PENDING_MESSAGE_TIMEOUT,CONSUMER_GROUP_NAME);
+        //when using consumer groups anything written to stream will not be detected if using StreamEntryID.UNRECEIVED_ENTRY.
+        StreamWriter writer = new StreamWriter(DRIVER_STREAM_NAME,jedisPool);
+        writer.kickOffStreamEvents(2,2);
     }
 
 }

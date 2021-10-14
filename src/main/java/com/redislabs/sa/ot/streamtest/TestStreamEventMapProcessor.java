@@ -34,6 +34,13 @@ public class TestStreamEventMapProcessor implements StreamEventMapProcessor {
                 System.out.println("key\t"+f+"\tvalue\t"+m.get(f));
                 if(f.equalsIgnoreCase(PAYLOAD_KEYNAME)){
                     String originalString = m.get(f);
+                    if(originalString.equalsIgnoreCase("poisonpill")){
+                        System.out.println("\n\n\t\tSIMULATING FAILED STATE...");
+                        try{
+                            Thread.sleep(90000);
+                        }catch(InterruptedException is){}
+                        throw new NullPointerException("DELIBERATELY KILLING MYSELF ON POISONPILL");
+                    }
                     String calcValue = doCalc(originalString);
                     String originalId = se.split(" ")[0];
                     writeToRedisStream(originalId,originalString,calcValue);

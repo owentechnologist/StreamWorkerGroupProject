@@ -56,19 +56,20 @@ public class RedisStreamAdapter {
                 while(true) {
                     try (Jedis streamReader = connectionPool.getResource();) {
                         //grab one entry from the target stream at a time
-                        //block forever
+                        //block for long time between attempts
                         List<Map.Entry<String, List<StreamEntry>>> streamResult =
                                 streamReader.xreadGroup(consumerGroupName, consumerName,
-                                        1, blockTime, true, new AbstractMap.SimpleEntry(streamName,StreamEntryID.UNRECEIVED_ENTRY));
+                                        1, blockTime, false, new AbstractMap.SimpleEntry(streamName,StreamEntryID.UNRECEIVED_ENTRY));
                         key = streamResult.get(0).getKey(); // name of Stream
                         streamEntryList = streamResult.get(0).getValue(); // we assume simple use of stream with a single update
                         value = streamEntryList.get(0);// entry written to stream
                         System.out.println("ConsumerGroup "+consumerGroupName+" and Consumer "+consumerName+" has received... "+key+" "+value);
                         Map<String,StreamEntry> entry = new HashMap();
                         entry.put(key+":"+value.getID(),value);
-                        streamEventMapProcessor.processStreamEventMap(entry);
                         lastSeenID = value.getID();
+                        streamEventMapProcessor.processStreamEventMap(entry);
                         streamReader.xack(key, consumerGroupName, lastSeenID);
+                        streamReader.xdel(key,lastSeenID);// delete test
                     }
                 }
             }
