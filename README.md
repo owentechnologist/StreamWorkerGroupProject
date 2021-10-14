@@ -71,7 +71,9 @@ This EntryProvenanceMetaData looks like this: (here we see worker '2' processed 
 
 
 
-    XADD X:FOR_PROCESSING{xyz} * "stringOffered" "poisonpill"
+
+        XADD X:FOR_PROCESSING{xyz} * "stringOffered" "poisonpill"
+
 
 
 Once the above entry is added, the worker that consumes it will die and the associated entry will enter Pending status.
