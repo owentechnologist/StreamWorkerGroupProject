@@ -28,31 +28,39 @@ This EntryProvenanceMetaData looks like this: (here we see worker '2' processed 
 * this version uses the default stream key
 * it also starts up 2 workers  ( id 1 and id 2 )
 * it also tells the writer to write 2 entries and then stop:
+
   
 
     mvn compile exec:java
+
 
 #### Non-Default (with 3 args):
 * Allows you to specify an alternate StreamID modifier as the first arg (for scaling)
 * Use 'xyz' to keep the same stream as the default
 * The second arg is the number of workers to start during this run
 * The third arg is an integer used as the lowest id to be used for worker ids in this run 
+
   
 
-    mvn compile exec:java -Dexec.args="xyz 2 3"
-    mvn compile exec:java -Dexec.args="xyz 4 5"
+        mvn compile exec:java -Dexec.args="xyz 2 3"
+
+        mvn compile exec:java -Dexec.args="xyz 4 5"
+
 
 #### Non-Default (with 4 args):
 * 4th arg Allows you to specify the maximum number of entries for the writer to produce
 
 
-    mvn compile exec:java -Dexec.args="xyz 2 3 1000"
+
+        mvn compile exec:java -Dexec.args="xyz 2 3 1000"
 
 #### Non-Default (with 5 args):
 * 5th arg Allows you to specify burst sizes (how many of the maximum number to write between brief pauses)
 
 
-    mvn compile exec:java -Dexec.args="xyz 2 3 1000 10"
+
+        mvn compile exec:java -Dexec.args="xyz 2 3 1000 10"
+
 
 ### NOTES:
 * I commented out the use of the Reaper in the Main.main method - It needs to be reconsidered as pending messages may need special treatment...
@@ -62,7 +70,9 @@ This EntryProvenanceMetaData looks like this: (here we see worker '2' processed 
   *  (you can execute this from redis-cli once for each worker you want to poison)
 
 
+
     XADD X:FOR_PROCESSING{xyz} * "stringOffered" "poisonpill"
+
 
 Once the above entry is added, the worker that consumes it will die and the associated entry will enter Pending status.
 
