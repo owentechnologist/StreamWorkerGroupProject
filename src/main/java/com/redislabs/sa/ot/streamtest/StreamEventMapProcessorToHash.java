@@ -4,29 +4,44 @@ import com.redislabs.sa.ot.util.JedisConnectionFactory;
 import com.redislabs.sa.ot.util.StreamEventMapProcessor;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.StreamEntry;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static com.redislabs.sa.ot.streamtest.StreamConstants.OUTPUT_STREAM_NAME;
-import static com.redislabs.sa.ot.streamtest.StreamConstants.PAYLOAD_KEYNAME;
+import static com.redislabs.sa.ot.streamtest.StreamConstants.*;
 
-public class TestStreamEventMapProcessor implements StreamEventMapProcessor {
+/**
+ * This class processes Event Entries passed to it by the RedisStreamAdapter
+ * It outputs Redis Hash objects that are written to Redis as evidence of the
+ * work being completed
+ * These Hash objects are set to last 8 hours (TTL)
+ */
+public class StreamEventMapProcessorToHash implements StreamEventMapProcessor {
 
     //make sure to set this value before passing this processor to the Stream Adapter
     private Object callbackTarget = null;
     static AtomicLong counter = new AtomicLong();
     private long sleepTime = 0;
 
-    public TestStreamEventMapProcessor setSleepTime(long sleepTime)
+    public StreamEventMapProcessorToHash setSleepTime(long sleepTime)
     {
         this.sleepTime = sleepTime;
         return this;
     }
 
+    void processPoisonPill(Map<String, String> payload){
+            System.out.println("processPoisonPill() Received: "+ payload.entrySet().toArray()[0]);
+            String id = payload.get("id");
+            System.out.println(id);
+            writeToRedisHash(":::poisonpill:"+id,
+                    "poisonpill","poisonpill");
+    }
+
     @Override
     public void processStreamEventMap(Map<String, StreamEntry> payload) {
-        System.out.println("\nTestEventMapProcessor.processMap()>>\t"+payload.keySet());
+        String keyValueString = ""+payload.keySet();
+        System.out.println("\nTestEventMapProcessor.processMap()>>\t"+keyValueString);
         doSleep();
         for( String se : payload.keySet()) {
             System.out.println(payload.get(se));
@@ -46,13 +61,13 @@ public class TestStreamEventMapProcessor implements StreamEventMapProcessor {
                     }
                     String calcValue = doCalc(originalString);
                     String originalId = se.split(" ")[0];
-                    writeToRedisStream(originalId,originalString,calcValue);
+                    writeToRedisHash(originalId,originalString,calcValue);
                 }
             }
         }
     }
 
-    void writeToRedisStream(String originalId,String originalString,String calcString){
+    void writeToRedisHash(String originalId,String originalString,String calcString){
         Jedis jedis = null;
         try {
             jedis = JedisConnectionFactory.getInstance().getJedisPool().getResource();
@@ -61,7 +76,9 @@ public class TestStreamEventMapProcessor implements StreamEventMapProcessor {
             map.put("calc_result", calcString);
             map.put(Runtime.getRuntime().toString()+"_Counter",""+counter.incrementAndGet());
             map.put("EntryProvenanceMetaData",originalId);
-            jedis.xadd(OUTPUT_STREAM_NAME, null, map);
+            map.put("worker_class",this.getClass().getCanonicalName());
+            jedis.hset("H:ProcessedEvent:"+originalId,map);
+            jedis.pexpire("H:ProcessedEvent:"+originalId,(HISTORY_TIMEOUT_LENGTH_MILLIS));// keep record of processing for 8 hours
         } catch (Throwable t) {
             System.out.println("WARNING:");
             t.printStackTrace();

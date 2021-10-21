@@ -62,12 +62,24 @@ This EntryProvenanceMetaData looks like this: (here we see worker '2' processed 
         mvn compile exec:java -Dexec.args="xyz 2 3 1000 10"
 
 
-### NOTES:
-* I commented out the use of the Reaper in the Main.main method - It needs to be reconsidered as pending messages may need special treatment...
-  * [Also, the command XAUTOCLAIM is not supported by all versions of Redis, (TODO: address this) ]
+#### Non-Default (with any number of args):
+* Allows you to specify output=hash as one of the args to the program
+* This makes the consumers started for that run use Hashes to record what they process instead of writing the evidence to a stream  
+* this sets up the posiibility of later creating an index and using search to look through the processed events
 
-* The workers now freeze and eventually throw NullPointer (Die) when a special entry is written like this:
-  *  (you can execute this from redis-cli once for each worker you want to poison)
+**   (You will have to ensure the search module is installed in your redis instance of course)
+
+Example Usage (works with any of the above argument options):
+
+
+        mvn compile exec:java -Dexec.args="xyz 2 3 1000 10 output=hash"
+        mvn compile exec:java -Dexec.args="output=hash"
+
+
+### NOTES:
+
+* A consumer will freeze and eventually throw NullPointer (Die) when a special entry is written like this:
+  *  (you can execute this from redis-cli once for each consumer you want to poison)
 
 
 
@@ -87,6 +99,16 @@ You can look for pending entries in the redis-Insights GUI or by issuing this co
 4) 1) 1) "6"
 2) "1"
 
+
+#### Beware the StreamReaper . . .  (joke)
+The StreamReaper class does 2 things every 30 seconds:
+1) executes XTRIM on the outbound work stream leaving only the last 100 entries 
+2) Scans for Pending Stream Entries and cleans up any that contain a poisonpill
+
+**  #2 above  means you only have 30 seconds to see any poison pills in the stream 
+-- note that evidence of processing the poisonpill will exist as a Hash written to Redis
+that has a keyname beginning with: H:ProcessedEvent::  <-- note the double colon
+   
 
 ### OTHER INFORMATION ABOUT STREAMS
 This link walks the reader through common uses of Streams :

@@ -11,5 +11,6 @@ public class StreamConstants {
     public static String DRIVER_STREAM_NAME = "";  // can't be final as it may be altered by Main.class
     public static final String OUTPUT_STREAM_BASE = "X:streamActivity{";  // can't be final as it may be altered by Main.class
     public static String OUTPUT_STREAM_NAME = "X:streamActivity{";  // can't be final as it may be altered by Main.class
+    public static long HISTORY_TIMEOUT_LENGTH_MILLIS = 60*60*1000*8; // 8 hours
 
 }

@@ -4,6 +4,10 @@ import com.redislabs.sa.ot.util.JedisConnectionFactory;
 import com.redislabs.sa.ot.util.RedisStreamAdapter;
 import redis.clients.jedis.JedisPool;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import static com.redislabs.sa.ot.streamtest.StreamConstants.*;
 
 /**
@@ -32,16 +36,31 @@ import static com.redislabs.sa.ot.streamtest.StreamConstants.*;
  * # 5th arg Allows you to specify the number of entries to write as fast as possible before taking a brief pause
  * mvn compile exec:java -Dexec.args="xyz 2 3 1000 10"
  *
- * To show Pending message behavior use the following command in redis-cli to break one of the workers:
+ * Non-Default (with any number of args):
+ * # Allows you to specify output=hash at any point in the arg list
+ * example:
+ * mvn compile exec:java -Dexec.args="xyz 2 3 1000 10 output=hash"
+ * or:
+ * mvn compile exec:java -Dexec.args="output=hash"
+ *
+ * This means the result of the work performed on the stream events
+ * flowing through Redis will be stored for 8 hours in individual Hashes
+ * This opens the door for using redis search to search and aggregate the results
+ * (You will need to create a search index and be sure the module is installed)
+ *
+ * *
+ * To show Pending message behavior use the following command in redis-cli to
+ * break one of the workers:
  * XADD X:FOR_PROCESSING{xyz} * "stringOffered" "poisonpill"
  *
  * Once the worker is stuck on the pill, you can check for pending messages like this:
- * XPENDING
+ * XPENDING X:FOR_PROCESSING{xyz} GROUP_ALPHA
  *
- * With this in mind - it may be best to make the reaper behave differently
- * - maybe it collects pending messages and submits them to a special consumer that can handle poison
- * (Currently the reaper just passes any pending messages found to worker #1)
- * Reaper is commented out - now that the poison pill test exists
+ * Note that every 30 seconds the StreamReaper collects pending messages and
+ * submits them to a special consumer that can exactly handle our poisonpill
+ * PoisonPill process records are stored as Hashes for 8 hours
+ * and can be found by scanning for:
+ * H:ProcessedEvent:::*
  *
  */
 
@@ -50,11 +69,13 @@ public class Main {
     static final String DEFAULT_UPDATES_STREAM = "X:FOR_PROCESSING{xyz}";
     static final String DEFAULT_OUTPUT_STREAM_NAME = "X:streamActivity{xyz}";
     static final JedisPool jedisPool = JedisConnectionFactory.getInstance().getJedisPool();
+    static final String HASHARG = "output=hash";
     static Main main = null;
     static int numWorkers = 2;
     static int workerStartId = 1;
     static long maxEntriesForWriter = 2;
     static long batchSizeBetweenWriterPauses = 2;
+
     //Pass in the preferred routing value to use when listening for stream events
     //examples: ddk  okg   pkg
     //Hint: you can browse for keys starting with X:FOR_PROCESSING and use one of their routing values
@@ -62,12 +83,25 @@ public class Main {
     public static void main(String[] args){
         String dataUpdatesStreamTarget = DEFAULT_UPDATES_STREAM;
         String outputStreamName = DEFAULT_OUTPUT_STREAM_NAME;
+        Boolean useHash = false;
         // here is where we apply any passed in args:
-
+        ArrayList<String> tempArgs = new ArrayList<String>();
+        if(Arrays.asList(args).contains(HASHARG)){
+            for(String e:args) {
+                if(e.equalsIgnoreCase(HASHARG)){
+                    //do not add to the new array
+                    useHash=true;
+                }else {
+                    tempArgs.add(e);
+                }
+            }
+            args = (String[]) tempArgs.toArray(new String[0]);
+            System.out.println(args.length);
+        }
         if(args.length>0){
             dataUpdatesStreamTarget  = DATA_UPDATES_STREAM_BASE+args[0]+"}";
             outputStreamName = OUTPUT_STREAM_BASE+args[0]+"}";
-            if(args.length>1){
+            if(args.length>2){
                 numWorkers = Integer.parseInt(args[1]);
                 workerStartId = Integer.parseInt(args[2]);
             }
@@ -84,26 +118,51 @@ public class Main {
         try{
             Thread.sleep(500); // give the writer time to establish some messages
         }catch(Throwable t){}
-
-        RedisStreamAdapter streamAdapter = new RedisStreamAdapter(DRIVER_STREAM_NAME,jedisPool);
-        streamAdapter.createConsumerGroup(CONSUMER_GROUP_NAME);
-        for(int x=0;x<numWorkers;x++){
-            int workerID = workerStartId+x;
-            if(x%2==0) {
-                streamAdapter.namedGroupConsumerStartListening("" +workerID,
-                        new TestStreamEventMapProcessor().setSleepTime(SLOW_WORKER_SLEEP_TIME));
-            }else{
-                streamAdapter.namedGroupConsumerStartListening("" + workerID,
-                        new TestStreamEventMapProcessor().setSleepTime(SPEEDY_WORKER_SLEEP_TIME));
-            }
+        if(useHash){
+            kickOffStreamAdapterWithHashResponse();
+        }else {
+            kickOffStreamAdapterWithStreamResponse();
         }
-        //StreamReaper reaper = new StreamReaper(dataUpdatesStreamTarget,jedisPool);
-        //reaper.kickOffStreamReaping(PENDING_MESSAGE_TIMEOUT,CONSUMER_GROUP_NAME);
+        StreamReaper reaper = new StreamReaper(dataUpdatesStreamTarget,jedisPool);
+        reaper.kickOffStreamReaping(PENDING_MESSAGE_TIMEOUT,CONSUMER_GROUP_NAME);
         //NB: when using consumer groups anything written to stream before the worker starts listening
         // will not be detected if using StreamEntryID.UNRECEIVED_ENTRY.
         // so we save starting up the writer to be the last task:
         StreamWriter writer = new StreamWriter(DRIVER_STREAM_NAME,jedisPool);
         writer.kickOffStreamEvents(maxEntriesForWriter,batchSizeBetweenWriterPauses);
+    }
+
+    private static void kickOffStreamAdapterWithStreamResponse() {
+        RedisStreamAdapter streamAdapter = new RedisStreamAdapter(DRIVER_STREAM_NAME,jedisPool);
+        streamAdapter.createConsumerGroup(CONSUMER_GROUP_NAME);
+        for(int x=0;x<numWorkers;x++){
+            int workerID = workerStartId+x;
+            if(x%2==0) {
+                // pass the StreamAdapter a MapProcessor to do some work
+                streamAdapter.namedGroupConsumerStartListening("" +workerID,
+                        new StreamEventMapProcessorToStream().setSleepTime(SLOW_WORKER_SLEEP_TIME));
+            }else{
+                // pass the StreamAdapter a MapProcessor to do some work
+                streamAdapter.namedGroupConsumerStartListening("" + workerID,
+                        new StreamEventMapProcessorToStream().setSleepTime(SPEEDY_WORKER_SLEEP_TIME));
+            }
+        }
+    }
+    private static void kickOffStreamAdapterWithHashResponse() {
+        RedisStreamAdapter streamAdapter = new RedisStreamAdapter(DRIVER_STREAM_NAME,jedisPool);
+        streamAdapter.createConsumerGroup(CONSUMER_GROUP_NAME);
+        for(int x=0;x<numWorkers;x++){
+            int workerID = workerStartId+x;
+            if(x%2==0) {
+                // pass the StreamAdapter a MapProcessor to do some work
+                streamAdapter.namedGroupConsumerStartListening("" +workerID,
+                        new StreamEventMapProcessorToHash().setSleepTime(SLOW_WORKER_SLEEP_TIME));
+            }else{
+                // pass the StreamAdapter a MapProcessor to do some work
+                streamAdapter.namedGroupConsumerStartListening("" + workerID,
+                        new StreamEventMapProcessorToHash().setSleepTime(SPEEDY_WORKER_SLEEP_TIME));
+            }
+        }
     }
 
 }
