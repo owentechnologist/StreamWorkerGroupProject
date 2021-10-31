@@ -52,14 +52,29 @@ public class StreamReaper {
                                         0, true, streamPendingSummary.getMinId());
                                 if (streamEntries.size() > 0) {
                                     System.out.println("We got a live one: " + streamEntries.get(0).getID());
-                                    StreamEntry value = streamEntries.get(0);
-                                    HashMap<String, String> poisonPayload = new HashMap<>((Map) value.getFields());
-                                    poisonPayload.put("id", value.getID().toString());
-                                    new StreamEventMapProcessorToHash().processPoisonPill((Map) poisonPayload);
-                                    streamReader.xack(streamName, groupName, streamEntries.get(0).getID());
+                                    StreamEntry discoveredPendingStreamEntry = streamEntries.get(0);
+                                    if(((String)discoveredPendingStreamEntry.getFields()
+                                            .get(StreamConstants.PAYLOAD_KEYNAME)).equalsIgnoreCase("poisonpill")) {
+                                        Map<String,StreamEntry> poisonPayload = new HashMap();
+                                        poisonPayload.put(streamName+":"+discoveredPendingStreamEntry.getID()+":"+consumerID,discoveredPendingStreamEntry);
+                                        new StreamEventMapProcessorToHash().processPoisonPill((Map) poisonPayload);
+                                    }else{  // we have a normal Pending message - just send it for regular processing
+                                        Map<String,StreamEntry> entry = new HashMap();
+                                        entry.put(streamName+":"+discoveredPendingStreamEntry.getID()+":"+consumerID,discoveredPendingStreamEntry);
+                                        new StreamEventMapProcessorToHash().processStreamEventMap(entry);
+                                    }
+                                    streamReader.xack(streamName, groupName, discoveredPendingStreamEntry.getID());
+                                    streamReader.xdel(streamName, discoveredPendingStreamEntry.getID());
                                 }
                             }
-                        }catch (Throwable t){System.out.println("Reaper Looking for Poison...> "+t.getMessage());}
+                        }catch (Throwable t){
+                            if(t.getMessage().equalsIgnoreCase("Cannot read the array length because \"bytes\" is null")){
+                                //do nothing
+                                //System.out.println("Reaper Looking for Poison...> None Found this time which results in null: "+t.getMessage());
+                            }else {
+                                t.printStackTrace();
+                            }
+                        }
                         counter++;
                         counter=counter%15; // reset counter to zero every 15 tries
                         }

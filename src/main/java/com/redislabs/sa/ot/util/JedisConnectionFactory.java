@@ -17,6 +17,10 @@ public class JedisConnectionFactory {
     public static final String minIdlePropertyName = "REDIS_MIN_IDLE";
     public static final String maxTotalPropertyName = "REDIS_MAX_TOTAL";
     public static final String maxWaitPropertyName = "REDIS_MAX_WAIT";
+    public static final String setTestOnBorrowPropertyName = "REDIS_TEST_ON_BORROW";
+    public static final String setTestOnReturnPropertyName = "REDIS_TEST_ON_RETURN";
+    public static final String setTestWhileIdlePropertyName = "REDIS_TEST_WHILE_IDLE";
+    public static final String setTestOnCreatePropertyName = "REDIS_TEST_ON_CREATE";
 
     private static JedisPool jedisPool;
     private static Properties config = null;
@@ -25,19 +29,25 @@ public class JedisConnectionFactory {
 
 
     public JedisConnectionFactory() {
-        config = PropertyFileFetcher.loadProps("jedisconnectionfactory.properties");
-        if(null == config){
-            System.out.println("\t[JedisConnectionFactory] USING HARD-CODED CONFIGURATION ... properties files not loaded...");
-            config = new Properties();
-            config.put(hostPropertyName,"localhost");
-            config.put(portPropertyName,"6379");
-            config.put(userPropertyName,"default");
-            config.put(passwordPropertyName,"");
-            config.put(timeoutPropertyName,"15000");
-            config.put(maxIdlePropertyName,"8");
-            config.put(minIdlePropertyName,"2");
-            config.put(maxTotalPropertyName,"8");
-            config.put(maxWaitPropertyName,"5000");
+        //System.out.println("\t[JedisConnectionFactory] USING HARD-CODED CONFIGURATION ... properties files not loaded...");
+        config = new Properties();
+        config.put(hostPropertyName,"localhost");
+        config.put(portPropertyName,"6379");
+        config.put(userPropertyName,"default");
+        config.put(passwordPropertyName,"");
+        config.put(timeoutPropertyName,"15000");
+        config.put(maxIdlePropertyName,"8");
+        config.put(minIdlePropertyName,"2");
+        config.put(maxTotalPropertyName,"8");
+        config.put(maxWaitPropertyName,"5000");
+        config.put(setTestOnBorrowPropertyName,false);
+        config.put(setTestOnReturnPropertyName,false);
+        config.put(setTestWhileIdlePropertyName,false);
+        //overwrite any properties set in properties file:
+        Properties loaded = PropertyFileFetcher.loadProps("jedisconnectionfactory.properties");
+        if (null != loaded){
+            config = loaded;
+            System.out.println(config.entrySet());
         }
         String host = (String) config.get(hostPropertyName);
         String port = (String) config.get(portPropertyName);
@@ -62,16 +72,16 @@ public class JedisConnectionFactory {
            If using threads 1.25-1.5x the number of threads is safe
            This will ensure that connections are kept to the back end so they will recycle quickly
         */
-        poolConf.setTestOnBorrow(false);
+        poolConf.setTestOnBorrow(Boolean.parseBoolean(config.getProperty(setTestOnBorrowPropertyName)));
         /* when true - send a ping before when we attempt to grab a connection from the pool
            Generally not recommended as while the PING command (https://redis.io/commands/PING) is relatively lightweight
            if there is much borrowing happening this can increase traffic if the number of operations per connection is low
         */
-        poolConf.setTestOnReturn(false);
+        poolConf.setTestOnReturn(Boolean.parseBoolean(config.getProperty(setTestOnReturnPropertyName)));
         /* when true - send a ping upon returning a pool connection
            I cannot imagine a scenario where this would be useful
         */
-        poolConf.setTestWhileIdle(true);
+        poolConf.setTestWhileIdle(Boolean.parseBoolean(config.getProperty(setTestWhileIdlePropertyName)));
         /* when true - send ping from idle resources in the pool
            Again the ping is not expensive
            Recommend setting this to true if you have a firewall between client and server that disconnects idle TCP connections
@@ -83,6 +93,10 @@ public class JedisConnectionFactory {
            Tune this carefully - often a good idea to slightly exceed your redis SLOWLOG settings,
            so you can view what is taking so long (https://redis.io/commands/slowlog)
         */
+        poolConf.setTestOnCreate(Boolean.parseBoolean(config.getProperty(setTestOnCreatePropertyName)));
+        /*
+        The above ??
+         */
         return poolConf;
     }
 
@@ -109,7 +123,7 @@ public class JedisConnectionFactory {
         } else {
             timeout = redis.clients.jedis.Protocol.DEFAULT_TIMEOUT;
         }
-
+        System.out.println("\nIS POOL CONFIG DONE?  --> "+initPoolConfig().toString());
         jedisPool = new JedisPool(initPoolConfig(), hostAndPort.getHost(), hostAndPort.getPort(), timeout, user, password);
     }
 

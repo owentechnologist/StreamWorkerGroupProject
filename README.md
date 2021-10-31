@@ -75,6 +75,13 @@ Example Usage (works with any of the above argument options):
         mvn compile exec:java -Dexec.args="xyz 2 3 1000 10 output=hash"
         mvn compile exec:java -Dexec.args="output=hash"
 
+If you do decide to use RediSearch here are some sample commands to create an index and query it: 
+
+        FT.CREATE idx:processedEvents PREFIX 1 "H:ProcessedEvent" SCHEMA EntryProvenanceMetaData TEXT arg_provided TEXT calc_result TEXT original_timestamp NUMERIC SORTABLE consumer_process_timestamp NUMERIC SORTABLE
+
+        FT.SEARCH idx:processedEvents * RETURN 4 original_timestamp consumer_process_timestamp arg_provided calc_result SORTBY consumer_process_timestamp DESC LIMIT 0 10
+
+
 
 ### NOTES:
 

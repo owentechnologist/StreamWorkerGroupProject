@@ -60,7 +60,7 @@ import static com.redislabs.sa.ot.streamtest.StreamConstants.*;
  * submits them to a special consumer that can exactly handle our poisonpill
  * PoisonPill process records are stored as Hashes for 8 hours
  * and can be found by scanning for:
- * H:ProcessedEvent:::*
+ * SCAN H:ProcessedEvent:*
  *
  */
 
