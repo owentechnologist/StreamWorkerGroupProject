@@ -17,9 +17,10 @@ import static com.redislabs.sa.ot.streamtest.StreamConstants.*;
  * work being completed
  * These Hash objects are set to last 8 hours (TTL)
  *
- * In case you want to kick it with Redis Search here are some sample commands:
- * FT.CREATE idx:processedEvents PREFIX 1 "H:ProcessedEvent" SCHEMA EntryProvenanceMetaData TEXT arg_provided TEXT calc_result TEXT original_timestamp NUMERIC SORTABLE consumer_process_timestamp NUMERIC SORTABLE
- * FT.SEARCH idx:processedEvents * RETURN 4 original_timestamp consumer_process_timestamp arg_provided calc_result SORTBY consumer_process_timestamp DESC LIMIT 0 10
+ * In case you want to try out Redis Search here are some sample commands:
+ * FT.CREATE idx:processedEvents PREFIX 1 "H:ProcessedEvent" SCHEMA EntryProvenanceMetaData TEXT arg_provided TEXT calc_result TEXT original_timestamp NUMERIC SORTABLE consumer_process_timestamp NUMERIC SORTABLE source_ip TAG
+ * FT.AGGREGATE "idx:processedEvents" "*" GROUPBY 1 @source_ip REDUCE COUNT_DISTINCT 1 arg_provided AS uniqueargs SORTBY 2 @uniqueargs DESC
+ * FT.SEARCH "idx:processedEvents" "-@source_ip:{64\\.7\\.94\\.15 | 64\\.7\\.94\\.14}" RETURN 5 source_ip original_timestamp consumer_process_timestamp arg_provided calc_result SORTBY source_ip DESC LIMIT 0 10
  */
 public class StreamEventMapProcessorToHash implements StreamEventMapProcessor {
 
@@ -95,6 +96,7 @@ public class StreamEventMapProcessorToHash implements StreamEventMapProcessor {
             map.put("worker_class",this.getClass().getCanonicalName());
             map.put("original_timestamp",""+orig_timestamp);
             map.put("consumer_process_timestamp",System.currentTimeMillis()+"");
+            map.put("source_ip",((System.nanoTime()%5)+60)+"."+((System.nanoTime()%5)+3)+"."+((System.nanoTime()%5)+90)+"."+((System.currentTimeMillis()%5)+11));
             jedis.hset("H:ProcessedEvent:"+originalId,map);
             jedis.pexpire("H:ProcessedEvent:"+originalId,(HISTORY_TIMEOUT_LENGTH_MILLIS));// keep record of processing for 8 hours
         } catch (Throwable t) {
