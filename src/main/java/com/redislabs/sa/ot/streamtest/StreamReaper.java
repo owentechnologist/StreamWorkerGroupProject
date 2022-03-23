@@ -2,7 +2,6 @@ package com.redislabs.sa.ot.streamtest;
 
 import com.github.javafaker.Faker;
 import redis.clients.jedis.*;
-import redis.clients.jedis.params.XClaimParams;
 import redis.clients.jedis.params.XTrimParams;
 
 import java.util.HashMap;
@@ -37,7 +36,7 @@ public class StreamReaper {
                         Thread.sleep(pendingMessageTimeout*300); // default is 100 millis *300 or 30 seconds
                     }catch(InterruptedException ie){}
                     try (Jedis streamReader = connectionPool.getResource();) {
-                        System.out.println(this.getClass().getCanonicalName()+" -- Claiming and trimming...  attempt # "+counter);
+                        System.out.println(this.getClass().getName()+" -- Claiming and trimming loop...  attempt # "+counter);
                         //trim output stream of any events older than X hours
                         XTrimParams xTrimParams = new XTrimParams().maxLen(100);//.approximateTrimming().minId(""+(System.currentTimeMillis()-HISTORY_TIMEOUT_LENGTH_MILLIS)+"-0");
                         streamReader.xtrim(StreamConstants.OUTPUT_STREAM_NAME,xTrimParams);
@@ -68,15 +67,20 @@ public class StreamReaper {
                                 }
                             }
                         }catch (Throwable t){
-                            if(t.getMessage().equalsIgnoreCase("Cannot read the array length because \"bytes\" is null")){
-                                //do nothing
-                                //System.out.println("Reaper Looking for Poison...> None Found this time which results in null: "+t.getMessage());
-                            }else {
+                            if(null == t.getMessage()){
+                                System.out.println(this.getClass().getName()+" : There are no pending messages to clean up");
                                 t.printStackTrace();
+                            }else {
+                                if (t.getMessage().equalsIgnoreCase("Cannot read the array length because \"bytes\" is null")) {
+                                    //do nothing
+                                    //System.out.println("Reaper Looking for Poison...> None Found this time which results in null: "+t.getMessage());
+                                } else {
+                                    t.printStackTrace();
+                                }
                             }
                         }
                         counter++;
-                        counter=counter%15; // reset counter to zero every 15 tries
+                        counter=counter%10; // reset counter to zero every 10 tries
                         }
                     }
                 }
