@@ -26,9 +26,10 @@ public class RedisStreamAdapter {
     // we need to only provide the consumer group name
     public void createConsumerGroup(String consumerGroupName){
         this.consumerGroupName = consumerGroupName;
-        StreamEntryID nextID = StreamEntryID.LAST_ENTRY;
+        StreamEntryID nextID = StreamEntryID.LAST_ENTRY; //This is the point at which the group begins
         try {
             String thing = this.connectionPool.getResource().xgroupCreate(this.streamName, this.consumerGroupName, nextID, true);
+            System.out.println(this.getClass().getName()+" : Result returned when creating a new ConsumerGroup "+thing);
         }catch(JedisDataException jde){
             if(jde.getMessage().contains("BUSYGROUP")) {
                 System.out.println("ConsumerGroup " + consumerGroupName + " already exists -- continuing");
@@ -52,7 +53,8 @@ public class RedisStreamAdapter {
                 System.out.println("RedisStreamAdapter.namedGroupConsumerStartListening(--> "+consumerName+"  <--): Actively Listening to Stream "+streamName);
                 long counter = 0;
                 Map.Entry<String, StreamEntryID> streamQuery = null;
-                long blockTime = Long.MAX_VALUE-200000; // on some OS MAX_VALUE results in a negative value! (overflow)
+                long oneDay = 60*60*24*1000;
+                long blockTime = oneDay; // on some OS MAX_VALUE results in a negative value! (overflow)
                 while(true) {
                     try (Jedis streamReader = connectionPool.getResource();) {
                         //grab one entry from the target stream at a time

@@ -11,7 +11,7 @@ public class PropertyFileFetcher {
     private static String pathToPropertiesFile;
 
     public static Properties loadProps(String propertyFileName){
-        boolean foundPathToPropertyFile = false;
+        boolean foundPathToPropertyFile = false; // deliberately short-circuiting the loading of properties file from file path
         Properties p=null;
         InputStream inputStream = null;
         /*

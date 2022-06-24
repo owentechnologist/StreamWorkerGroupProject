@@ -77,9 +77,9 @@ Example Usage (works with any of the above argument options):
 
 If you do decide to use RediSearch here are some sample commands to create an index and query it: 
 
-    FT.CREATE idx:processedEvents PREFIX 1 "H:ProcessedEvent" SCHEMA EntryProvenanceMetaData TEXT arg_provided TEXT calc_result TEXT original_timestamp NUMERIC SORTABLE consumer_process_timestamp NUMERIC SORTABLE source_ip TAG
-    FT.AGGREGATE "idx:processedEvents" "*" GROUPBY 1 @source_ip REDUCE COUNT_DISTINCT 1 arg_provided AS uniqueargs SORTBY 2 @uniqueargs DESC
-    FT.SEARCH "idx:processedEvents" "-@source_ip:{64\\.7\\.94\\.15 | 64\\.7\\.94\\.14}" RETURN 5 source_ip original_timestamp consumer_process_timestamp arg_provided calc_result SORTBY source_ip DESC LIMIT 0 10
+    FT.CREATE idx_processedEvents PREFIX 1 "H:ProcessedEvent" SCHEMA EntryProvenanceMetaData TEXT arg_provided TEXT calc_result TEXT original_timestamp NUMERIC SORTABLE consumer_process_timestamp NUMERIC SORTABLE source_ip TAG
+    FT.AGGREGATE "idx_processedEvents" "*" GROUPBY 1 @source_ip REDUCE COUNT_DISTINCT 1 arg_provided AS uniqueargs SORTBY 2 @uniqueargs DESC
+    FT.SEARCH "idx_processedEvents" "-@source_ip:{64\\.7\\.94\\.15 | 64\\.7\\.94\\.14}" RETURN 5 source_ip original_timestamp consumer_process_timestamp arg_provided calc_result SORTBY source_ip DESC LIMIT 0 10
 
 
 ### NOTES:

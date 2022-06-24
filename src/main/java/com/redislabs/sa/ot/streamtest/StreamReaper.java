@@ -4,6 +4,7 @@ import com.github.javafaker.Faker;
 import redis.clients.jedis.*;
 import redis.clients.jedis.params.XTrimParams;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,13 +33,13 @@ public class StreamReaper {
                 Map<String, String> map1 = new HashMap<>();
                 long counter = 0;
                 while (true) {
-                    try{
-                        Thread.sleep(pendingMessageTimeout*300); // default is 100 millis *300 or 30 seconds
+                    try{ //PENDING_MESSAGE_TIMEOUT originates from Class StreamConstants and in this version is not modified by caller 'Main'
+                        Thread.sleep(pendingMessageTimeout); // default is 60 seconds
                     }catch(InterruptedException ie){}
                     try (Jedis streamReader = connectionPool.getResource();) {
-                        System.out.println(this.getClass().getName()+" -- Claiming and trimming loop...  attempt # "+counter);
-                        //trim output stream of any events older than X hours
-                        XTrimParams xTrimParams = new XTrimParams().maxLen(100);//.approximateTrimming().minId(""+(System.currentTimeMillis()-HISTORY_TIMEOUT_LENGTH_MILLIS)+"-0");
+                        System.out.println(this.getClass().getName()+" -- Claiming and trimming loop...  attempt # "+counter+"   "+new Date());
+                        //trim output stream of any events other than the most recent 100 events
+                        XTrimParams xTrimParams = new XTrimParams().maxLen(100);
                         streamReader.xtrim(StreamConstants.OUTPUT_STREAM_NAME,xTrimParams);
                         try {
                             StreamPendingSummary streamPendingSummary = streamReader.xpending(streamName, StreamConstants.CONSUMER_GROUP_NAME);
@@ -81,9 +82,12 @@ public class StreamReaper {
                         }
                         counter++;
                         counter=counter%10; // reset counter to zero every 10 tries
+                        if(counter==0) {
+                            System.out.println("\t>>> Resetting StreamReaper Counter to 0 at " + new Date());
                         }
                     }
                 }
+            }
         }).start();
     }
 
