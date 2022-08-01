@@ -70,6 +70,7 @@ public class Main {
     static final String DEFAULT_OUTPUT_STREAM_NAME = "X:streamActivity{xyz}";
     static final JedisPool jedisPool = JedisConnectionFactory.getInstance().getJedisPool();
     static final String HASHARG = "output=hash";
+    static final String NOREAPER = "reaper=no";
     static Main main = null;
     static int numWorkers = 2;
     static int workerStartId = 1;
@@ -84,14 +85,17 @@ public class Main {
         String dataUpdatesStreamTarget = DEFAULT_UPDATES_STREAM;
         String outputStreamName = DEFAULT_OUTPUT_STREAM_NAME;
         Boolean useHash = false;
+        Boolean launchReaper = true; // by default we run the reaper that trims the output stream and checks for poisonpills
         // here is where we apply any passed in args:
         ArrayList<String> tempArgs = new ArrayList<String>();
-        if(Arrays.asList(args).contains(HASHARG)){
+        if(Arrays.asList(args).contains(HASHARG)||Arrays.asList(args).contains(NOREAPER)){
             for(String e:args) {
                 if(e.equalsIgnoreCase(HASHARG)){
                     //do not add to the new array
                     useHash=true;
-                }else {
+                }else if(e.equalsIgnoreCase(NOREAPER)) {
+                    launchReaper = false;
+                }else{
                     tempArgs.add(e);
                 }
             }
@@ -123,8 +127,10 @@ public class Main {
         }else {
             kickOffStreamAdapterWithStreamResponse();
         }
-        StreamReaper reaper = new StreamReaper(dataUpdatesStreamTarget,jedisPool);
-        reaper.kickOffStreamReaping(PENDING_MESSAGE_TIMEOUT,CONSUMER_GROUP_NAME);
+        if(launchReaper) {
+            StreamReaper reaper = new StreamReaper(dataUpdatesStreamTarget, jedisPool);
+            reaper.kickOffStreamReaping(PENDING_MESSAGE_TIMEOUT, CONSUMER_GROUP_NAME);
+        }
         //NB: when using consumer groups anything written to stream before the worker starts listening
         // will not be detected if using StreamEntryID.UNRECEIVED_ENTRY.
         // so we save starting up the writer to be the last task:
