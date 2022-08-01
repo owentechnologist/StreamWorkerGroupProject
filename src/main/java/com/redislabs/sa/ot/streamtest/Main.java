@@ -16,7 +16,8 @@ import static com.redislabs.sa.ot.streamtest.StreamConstants.*;
  * # this version uses the default stream key
  * # it also starts up 2 workers  ( id 1 and id 2 )
  * # it also tells the writer to
- * # write 2 entries and then stop:
+ * # write 2 entries and then stop
+ * # the reaper that trims the output stream and checks for pending work is started as well:
  * mvn compile exec:java
  *
  * Non-Default (with 3 args):
@@ -37,16 +38,20 @@ import static com.redislabs.sa.ot.streamtest.StreamConstants.*;
  * mvn compile exec:java -Dexec.args="xyz 2 3 1000 10"
  *
  * Non-Default (with any number of args):
- * # Allows you to specify output=hash at any point in the arg list
+ * # You can specify output=hash at any point in the arg list
  * example:
  * mvn compile exec:java -Dexec.args="xyz 2 3 1000 10 output=hash"
  * or:
  * mvn compile exec:java -Dexec.args="output=hash"
  *
- * This means the result of the work performed on the stream events
+ * ^ This means the result of the work performed on the stream events
  * flowing through Redis will be stored for 8 hours in individual Hashes
  * This opens the door for using redis search to search and aggregate the results
  * (You will need to create a search index and be sure the module is installed)
+ * *
+ * # You can also specify reaper=no at any point in the arg list
+ * For example, if you just want to publish events and have no workers or reaper you can use the following:
+ * mvn compile exec:java -Dexec.args="xyz 0 0 10000 reaper=no"
  *
  * *
  * To show Pending message behavior use the following command in redis-cli to
