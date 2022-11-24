@@ -3,7 +3,8 @@ package com.redislabs.sa.ot.streamtest;
 import com.redislabs.sa.ot.util.JedisConnectionFactory;
 import com.redislabs.sa.ot.util.StreamEventMapProcessor;
 import redis.clients.jedis.Jedis;
-import redis.clients.jedis.StreamEntry;
+import redis.clients.jedis.StreamEntryID;
+import redis.clients.jedis.resps.StreamEntry;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -33,15 +34,15 @@ public class StreamEventMapProcessorToStream implements StreamEventMapProcessor 
 
     @Override
     public void processStreamEventMap(Map<String, StreamEntry> payload) {
-        System.out.println("\nTestEventMapProcessor.processMap()>>\t"+payload.keySet());
-        doSleep();
+        printMessageSparingly("\nStreamEventMapProcessorToStream.processStreamEventMap()>>\t" + payload.keySet());
+        doSleep(); // the point of this is to simulate slower workers
         for( String se : payload.keySet()) {
-            System.out.println(payload.get(se));
+            printMessageSparingly(payload.get(se).toString());
             StreamEntry x = payload.get(se);
             Map<String,String> m = x.getFields();
             String aString = "";
             for( String f : m.keySet()){
-                System.out.println("key\t"+f+"\tvalue\t"+m.get(f));
+                printMessageSparingly("key\t"+f+"\tvalue\t"+m.get(f));
                 if(f.equalsIgnoreCase(PAYLOAD_KEYNAME)){
                     String originalString = m.get(f);
                     if(originalString.equalsIgnoreCase("poisonpill")){
@@ -59,6 +60,12 @@ public class StreamEventMapProcessorToStream implements StreamEventMapProcessor 
         }
     }
 
+    void printMessageSparingly(String message){
+        if(counter.get()%10==0) {
+            System.out.println(message);
+        }
+    }
+
     void writeToRedisStream(String originalId,String originalString,String calcString){
         Jedis jedis = null;
         try {
@@ -68,7 +75,7 @@ public class StreamEventMapProcessorToStream implements StreamEventMapProcessor 
             map.put("calc_result", calcString);
             map.put(Runtime.getRuntime().toString()+"_Counter",""+counter.incrementAndGet());
             map.put("EntryProvenanceMetaData",originalId);
-            jedis.xadd(OUTPUT_STREAM_NAME, null, map);
+            jedis.xadd(OUTPUT_STREAM_NAME, StreamEntryID.NEW_ENTRY,map);
         } catch (Throwable t) {
             System.out.println("WARNING:");
             t.printStackTrace();

@@ -6,7 +6,6 @@ import redis.clients.jedis.JedisPool;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 import static com.redislabs.sa.ot.streamtest.StreamConstants.*;
 
@@ -72,11 +71,10 @@ import static com.redislabs.sa.ot.streamtest.StreamConstants.*;
 public class Main {
 
     static final String DEFAULT_UPDATES_STREAM = "X:FOR_PROCESSING{xyz}";
-    static final String DEFAULT_OUTPUT_STREAM_NAME = "X:streamActivity{xyz}";
+    static final String DEFAULT_OUTPUT_STREAM_NAME = "X:PROCESSED_EVENTS{xyz}";
     static final JedisPool jedisPool = JedisConnectionFactory.getInstance().getJedisPool();
     static final String HASHARG = "output=hash";
     static final String NOREAPER = "reaper=no";
-    static Main main = null;
     static int numWorkers = 2;
     static int workerStartId = 1;
     static long maxEntriesForWriter = 2;
@@ -108,8 +106,8 @@ public class Main {
             System.out.println(args.length);
         }
         if(args.length>0){
-            dataUpdatesStreamTarget  = DATA_UPDATES_STREAM_BASE+args[0]+"}";
-            outputStreamName = OUTPUT_STREAM_BASE+args[0]+"}";
+            dataUpdatesStreamTarget  = StreamConstants.DATA_UPDATES_STREAM_BASE+args[0]+"}";
+            outputStreamName = StreamConstants.OUTPUT_STREAM_BASE+args[0]+"}";
             if(args.length>2){
                 numWorkers = Integer.parseInt(args[1]);
                 workerStartId = Integer.parseInt(args[2]);
@@ -121,8 +119,8 @@ public class Main {
                 batchSizeBetweenWriterPauses = Integer.parseInt(args[4]);
             }
         }
-        OUTPUT_STREAM_NAME = outputStreamName;
-        DRIVER_STREAM_NAME = dataUpdatesStreamTarget;
+        StreamConstants.OUTPUT_STREAM_NAME = outputStreamName;
+        StreamConstants.DRIVER_STREAM_NAME = dataUpdatesStreamTarget;
 
         try{
             Thread.sleep(500); // give the writer time to establish some messages
@@ -134,44 +132,44 @@ public class Main {
         }
         if(launchReaper) {
             StreamReaper reaper = new StreamReaper(dataUpdatesStreamTarget, jedisPool);
-            reaper.kickOffStreamReaping(PENDING_MESSAGE_TIMEOUT, CONSUMER_GROUP_NAME);
+            reaper.kickOffStreamReaping(StreamConstants.PENDING_MESSAGE_TIMEOUT, StreamConstants.CONSUMER_GROUP_NAME);
         }
         //NB: when using consumer groups anything written to stream before the worker starts listening
         // will not be detected if using StreamEntryID.UNRECEIVED_ENTRY.
         // so we save starting up the writer to be the last task:
-        StreamWriter writer = new StreamWriter(DRIVER_STREAM_NAME,jedisPool);
+        StreamWriter writer = new StreamWriter(StreamConstants.DRIVER_STREAM_NAME,jedisPool);
         writer.kickOffStreamEvents(maxEntriesForWriter,batchSizeBetweenWriterPauses);
     }
 
     private static void kickOffStreamAdapterWithStreamResponse() {
-        RedisStreamAdapter streamAdapter = new RedisStreamAdapter(DRIVER_STREAM_NAME,jedisPool);
-        streamAdapter.createConsumerGroup(CONSUMER_GROUP_NAME);
+        RedisStreamAdapter streamAdapter = new RedisStreamAdapter(StreamConstants.DRIVER_STREAM_NAME,jedisPool);
+        streamAdapter.createConsumerGroup(StreamConstants.CONSUMER_GROUP_NAME);
         for(int x=0;x<numWorkers;x++){
             int workerID = workerStartId+x;
             if(x%2==0) {
                 // pass the StreamAdapter a MapProcessor to do some work
                 streamAdapter.namedGroupConsumerStartListening("" +workerID,
-                        new StreamEventMapProcessorToStream().setSleepTime(SLOW_WORKER_SLEEP_TIME));
+                        new StreamEventMapProcessorToStream().setSleepTime(StreamConstants.SLOW_WORKER_SLEEP_TIME));
             }else{
                 // pass the StreamAdapter a MapProcessor to do some work
                 streamAdapter.namedGroupConsumerStartListening("" + workerID,
-                        new StreamEventMapProcessorToStream().setSleepTime(SPEEDY_WORKER_SLEEP_TIME));
+                        new StreamEventMapProcessorToStream().setSleepTime(StreamConstants.SPEEDY_WORKER_SLEEP_TIME));
             }
         }
     }
     private static void kickOffStreamAdapterWithHashResponse() {
-        RedisStreamAdapter streamAdapter = new RedisStreamAdapter(DRIVER_STREAM_NAME,jedisPool);
-        streamAdapter.createConsumerGroup(CONSUMER_GROUP_NAME);
+        RedisStreamAdapter streamAdapter = new RedisStreamAdapter(StreamConstants.DRIVER_STREAM_NAME,jedisPool);
+        streamAdapter.createConsumerGroup(StreamConstants.CONSUMER_GROUP_NAME);
         for(int x=0;x<numWorkers;x++){
             int workerID = workerStartId+x;
             if(x%2==0) {
                 // pass the StreamAdapter a MapProcessor to do some work
                 streamAdapter.namedGroupConsumerStartListening("" +workerID,
-                        new StreamEventMapProcessorToHash().setSleepTime(SLOW_WORKER_SLEEP_TIME));
+                        new StreamEventMapProcessorToHash().setSleepTime(StreamConstants.SLOW_WORKER_SLEEP_TIME));
             }else{
                 // pass the StreamAdapter a MapProcessor to do some work
                 streamAdapter.namedGroupConsumerStartListening("" + workerID,
-                        new StreamEventMapProcessorToHash().setSleepTime(SPEEDY_WORKER_SLEEP_TIME));
+                        new StreamEventMapProcessorToHash().setSleepTime(StreamConstants.SPEEDY_WORKER_SLEEP_TIME));
             }
         }
     }

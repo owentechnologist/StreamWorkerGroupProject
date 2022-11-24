@@ -3,6 +3,7 @@ package com.redislabs.sa.ot.streamtest;
 import com.github.javafaker.Faker;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.params.XAddParams;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -30,7 +31,7 @@ public class StreamWriter {
                     try (Jedis streamReader = connectionPool.getResource();) {
                         String payload = faker.name().firstName();
                         map1.put(PAYLOAD_KEYNAME, payload);
-                        streamReader.xadd(streamName, null, map1);
+                        streamReader.xadd(streamName, XAddParams.xAddParams(), map1);
                         counter++;
                         if(counter % pauseSize ==0){
                             try{

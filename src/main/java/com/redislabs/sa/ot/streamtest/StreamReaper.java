@@ -2,12 +2,15 @@ package com.redislabs.sa.ot.streamtest;
 
 import com.github.javafaker.Faker;
 import redis.clients.jedis.*;
+import redis.clients.jedis.params.XClaimParams;
+import redis.clients.jedis.resps.StreamEntry;
 import redis.clients.jedis.params.XTrimParams;
+import redis.clients.jedis.resps.StreamPendingSummary;
 
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.List;
 
 public class StreamReaper {
 
@@ -48,8 +51,9 @@ public class StreamReaper {
                                 String consumerID = (String) streamPendingSummary.getConsumerMessageCount().keySet().toArray()[0];
                                 System.out.println("Min ID of the PENDING entries equals: " + streamPendingSummary.getMinId());
                                 System.out.println("consumerID == " + consumerID);
-                                List<StreamEntry> streamEntries = streamReader.xclaim(streamName, groupName, consumerID, 30, 0,
-                                        0, true, streamPendingSummary.getMinId());
+
+                                List<StreamEntry> streamEntries = streamReader.xclaim(streamName,groupName,consumerID,30, XClaimParams.xClaimParams(),streamPendingSummary.getMinId());
+
                                 if (streamEntries.size() > 0) {
                                     System.out.println("We got a live one: " + streamEntries.get(0).getID());
                                     StreamEntry discoveredPendingStreamEntry = streamEntries.get(0);

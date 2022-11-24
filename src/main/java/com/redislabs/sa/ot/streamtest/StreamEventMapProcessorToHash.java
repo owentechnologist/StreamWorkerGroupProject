@@ -3,7 +3,7 @@ package com.redislabs.sa.ot.streamtest;
 import com.redislabs.sa.ot.util.JedisConnectionFactory;
 import com.redislabs.sa.ot.util.StreamEventMapProcessor;
 import redis.clients.jedis.Jedis;
-import redis.clients.jedis.StreamEntry;
+import redis.clients.jedis.resps.StreamEntry;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -58,7 +58,7 @@ public class StreamEventMapProcessorToHash implements StreamEventMapProcessor {
     @Override
     public void processStreamEventMap(Map<String, StreamEntry> payload) {
         String keyValueString = ""+payload.keySet();
-        System.out.println("\nTestEventMapProcessor.processMap()>>\t"+keyValueString);
+        System.out.println("\nStreamEventMapProcessorToHash.processStreamEventMap()>>\t"+keyValueString);
         doSleep();
         for( String se : payload.keySet()) {
             System.out.println(payload.get(se));

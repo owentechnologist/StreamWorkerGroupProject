@@ -2,20 +2,24 @@ package com.redislabs.sa.ot.util;
 
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.StreamEntry;
+import redis.clients.jedis.params.XReadGroupParams;
+import redis.clients.jedis.params.XReadParams;
+import redis.clients.jedis.resps.StreamEntry;
 import redis.clients.jedis.StreamEntryID;
 import redis.clients.jedis.exceptions.JedisDataException;
 
-import java.util.AbstractMap;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+
+import static java.util.Collections.singletonMap;
 
 public class RedisStreamAdapter {
 
     private JedisPool connectionPool;
     private String streamName;
     private String consumerGroupName;
+    private int oneDay = 60*60*24*1000;
+    private long printcounter = 0;
+
 
     public RedisStreamAdapter(String streamName, JedisPool connectionPool){
         this.connectionPool=connectionPool;
@@ -53,20 +57,26 @@ public class RedisStreamAdapter {
                 System.out.println("RedisStreamAdapter.namedGroupConsumerStartListening(--> "+consumerName+"  <--): Actively Listening to Stream "+streamName);
                 long counter = 0;
                 Map.Entry<String, StreamEntryID> streamQuery = null;
-                long oneDay = 60*60*24*1000;
-                long blockTime = oneDay; // on some OS MAX_VALUE results in a negative value! (overflow)
                 while(true) {
                     try (Jedis streamReader = connectionPool.getResource();) {
                         //grab one entry from the target stream at a time
                         //block for long time between attempts
+                        XReadGroupParams xReadGroupParams = new XReadGroupParams().block(oneDay).count(1);
+                        HashMap hashMap = new HashMap();
+                        hashMap.put(streamName,StreamEntryID.UNRECEIVED_ENTRY);
                         List<Map.Entry<String, List<StreamEntry>>> streamResult =
-                                streamReader.xreadGroup(consumerGroupName, consumerName,
-                                        1, blockTime, false, new AbstractMap.SimpleEntry(streamName,StreamEntryID.UNRECEIVED_ENTRY));
+                                streamReader.xreadGroup(consumerGroupName,consumerName,
+                                        xReadGroupParams,
+                                        (Map<String, StreamEntryID>)hashMap);
                         key = streamResult.get(0).getKey(); // name of Stream
                         streamEntryList = streamResult.get(0).getValue(); // we assume simple use of stream with a single update
                         value = streamEntryList.get(0);// entry written to stream
-                        System.out.println( "Consumer "+consumerName+" of ConsumerGroup "+consumerGroupName+" has received... "+key+" "+value);
-                        Map<String,StreamEntry> entry = new HashMap();
+                        //only print 1 of 10 these next lines:
+                        if(printcounter%10==0) {
+                            System.out.println("Consumer " + consumerName + " of ConsumerGroup " + consumerGroupName + " has received... " + key + " " + value);
+                        }
+                        printcounter++;
+                        Map<String, StreamEntry> entry = new HashMap();
                         entry.put(key+":"+value.getID()+":"+consumerName,value);
                         lastSeenID = value.getID();
                         streamEventMapProcessor.processStreamEventMap(entry);
@@ -90,12 +100,12 @@ public class RedisStreamAdapter {
                         StreamEntry value = null;
                         StreamEntryID nextID = new StreamEntryID();
                         System.out.println("main.kickOffStreamListenerThread: Actively Listening to Stream "+streamName);
-                        Map.Entry<String, StreamEntryID> streamQuery = null;
+                        Map<String, StreamEntryID> streamQuery = singletonMap(streamName, nextID);
+                        XReadParams xReadParams = new XReadParams().block(oneDay).count(1);
                         while(true){
-                            streamQuery = new AbstractMap.SimpleImmutableEntry<>(
-                                    streamName, nextID);
+                            streamQuery = singletonMap(streamName, nextID);
                             List<Map.Entry<String, List<StreamEntry>>> streamResult =
-                                    streamListener.xread(1,Long.MAX_VALUE,streamQuery);// <--  has to be Long.MAX_VALUE to work
+                                    streamListener.xread(xReadParams,streamQuery);
                             key = streamResult.get(0).getKey(); // name of Stream
                             streamEntryList = streamResult.get(0).getValue(); // we assume simple use of stream with a single update
 
